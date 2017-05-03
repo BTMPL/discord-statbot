@@ -29,6 +29,14 @@ const normalizeUrl = (url) => {
 	return (ssl ? 'https://' : 'http://') + url;
 }
 
+bot.on("messageUpdate", (oldMsg, newMsg) => {
+	sql.query('UPDATE `messages` SET `content` = ? WHERE `messageId` = ?', [newMsg.content, oldMsg.id], (er) => {
+		if(er) {
+			console.log('ERROR', er);
+		}
+	});
+})
+
 bot.on("message", msg => {
 	const payload = [
 		msg.id,
