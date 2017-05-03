@@ -20,6 +20,20 @@ const port = process.env.PORT || 8080;
 
 const router = express.Router();
 
+router.get('/stats', (req, res) => {
+  const channelStats = new Promise((resolve) => {
+    sql.query('SELECT `channelName`, COUNT(`id`) AS `messageCount` FROM `messages` GROUP BY `channelName` ORDER BY `channelName` ASC', (er, results) => {
+      resolve(results);
+    });
+  });
+
+  Promise.all([channelStats]).then(data => {
+    res.json({
+      channels: data[0]
+    })    
+  })
+});
+
 router.get('/channel/:channel', function(req, res) {
   let limit = req.query.limit ? parseInt(req.query.limit) : 50;
   if(limit > 200) limit = 200;

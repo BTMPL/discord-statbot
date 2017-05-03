@@ -45,7 +45,7 @@ bot.on("message", msg => {
 		msg.author.username,
 		msg.author.id,
 		msg.channel.name,
-		msg.content
+		msg.cleanContent
 	];
 	sql.query('INSERT INTO `messages` SET `messageId` = ?, `createdAt` = FROM_UNIXTIME(?), `authorName` = ?, `authorId` = ?, `channelName` = ?, `content` = ?', payload, (er, res, fields) => {
 		if(er) {
