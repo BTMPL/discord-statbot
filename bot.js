@@ -39,6 +39,29 @@ bot.on("messageUpdate", (oldMsg, newMsg) => {
 })
 
 bot.on("message", msg => {
+	const contextRequests = msg.cleanContent.match(/(!context [0-9]+)/g);
+	if(contextRequests && contextRequests.length > 0) {
+		const promises = contextRequests.map(messageId => {
+			messageId = messageId.replace(/\D+/g, '');
+			return new Promise(res => {
+				sql.query('SELECT * FROM `messages` WHERE `messageId` = ? LIMIT 1', [messageId], (er, results) => {
+					if(er) console.log('ERROR', er);
+					if(results && results[0]) res(results[0].channelName)
+				});
+			});
+		});
+
+		Promise.all(promises).then(channels => {
+			const messages = [];
+			channels.forEach((channel, index) => {
+				messages.push('https://reactistory.com/#/channel/' + channel + '/' + contextRequests[index].replace(/\D+/g, ''));
+			});
+
+			msg.channel.send("For more context please see " + messages.join(" "));
+		})
+					
+	}
+
 	const payload = [
 		msg.id,
 		msg._timestamp,
