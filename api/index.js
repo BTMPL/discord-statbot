@@ -6,7 +6,8 @@ const sql = mysql.createConnection({
   host     : 'localhost',
   user     : process.env.DB_USER,
   password : process.env.DB_PASS,
-  database : process.env.DB_DATABASE
+  database : process.env.DB_DATABASE,
+  supportBigNumbers: true
 });
 sql.connect();
 
@@ -22,20 +23,11 @@ const router = express.Router();
 router.get('/channel/:channel', function(req, res) {
   let limit = req.query.limit ? parseInt(req.query.limit) : 50;
   if(limit > 200) limit = 200;
-  
-  const where = [];
-  where.push('`channelName` = ' + sql.escape(req.params.channel));
 
-  if(req.query.before) {
-    where.push('`messageId` < ' + req.query.before.replace(/\D+/g, ''));
-  }
-
-  if(req.query.after) {
-    where.push('`messageId` > ' + req.query.after.replace(/\D+/g, ''));
-  }
-  
-  console.log('SELECT * FROM `messages` WHERE ' + where.join(' AND ') + ' ORDER BY `messageId` DESC LIMIT 0, ?');
-  sql.query('SELECT * FROM `messages` WHERE ' + where.join(' AND ') + ' ORDER BY `messageId` DESC LIMIT 0, ?', [limit], (er, response, fields) => {
+  const handleQuery = (er, response, fields) => {
+    if(er) {
+      console.log('ERROR', er);
+    }
     if(response && response.length > 0) {
       Promise.all(response.reverse().map(parseDiscordMessage))
         .then(parsedMessages => {
@@ -56,7 +48,34 @@ router.get('/channel/:channel', function(req, res) {
         },        
       })
     }   
-  }) 
+  };
+  
+  if(req.query.context) {    
+    const messageId = req.query.context.replace(/\D+/g, '');    
+    sql.query('SELECT * FROM `messages` WHERE `channelName` = ' + sql.escape(req.params.channel) + ' AND `messageId` = ' + messageId +
+      ' UNION ALL ' + 
+        ' (SELECT * FROM `messages` WHERE `channelName` = ' + sql.escape(req.params.channel) 
+        + ' AND `messageId` < ' + messageId + ' ORDER BY `messageId` DESC LIMIT ' + Math.round(limit / 2) +') ' + 
+      ' UNION ALL ' + 
+        ' (SELECT * FROM `messages` WHERE `channelName` = ' + sql.escape(req.params.channel) 
+        + ' AND `messageId` > ' + messageId + ' ORDER BY `messageId` ASC LIMIT ' + Math.round(limit / 2) + ') ' +
+      ' ORDER BY `messageId` DESC',
+    handleQuery);
+  }
+  else {
+    const where = [];
+    where.push('`channelName` = ' + sql.escape(req.params.channel));
+
+    if(req.query.before) {
+      where.push('`messageId` < ' + req.query.before.replace(/\D+/g, ''));
+    }
+
+    if(req.query.after) {
+      where.push('`messageId` > ' + req.query.after.replace(/\D+/g, ''));
+    }
+
+    sql.query('SELECT * FROM `messages` WHERE ' + where.join(' AND ') + ' ORDER BY `messageId` DESC LIMIT 0, ?', [limit], handleQuery) 
+  }  
 });
 
 const parseDiscordMessage = (message) => {
