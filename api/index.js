@@ -21,15 +21,50 @@ const port = process.env.PORT || 8080;
 const router = express.Router();
 
 router.get('/stats', (req, res) => {
+
+  const summary = new Promise((resolve) => {
+    sql.query('SELECT COUNT(`id`) AS `messageCount`, COUNT(DISTINCT `authorName`) as `activeUsers` FROM `messages`', (er, results) => {
+      resolve(results);
+    });
+  });
+
+  const last24h = new Promise((resolve) => {
+    sql.query('SELECT COUNT(`id`) AS `messageCount`, COUNT(DISTINCT `authorName`) as `activeUsers` FROM `messages` WHERE `createdAt` > NOW() - INTERVAL 1 DAY', (er, results) => {
+      resolve(results);
+    });
+  });  
+
   const channelStats = new Promise((resolve) => {
     sql.query('SELECT `channelName`, COUNT(`id`) AS `messageCount` FROM `messages` GROUP BY `channelName` ORDER BY `channelName` ASC', (er, results) => {
       resolve(results);
     });
   });
 
-  Promise.all([channelStats]).then(data => {
-    res.json({
-      channels: data[0]
+  /**
+   * get top contributors this year
+   */
+  const monthTalkers = [];
+  const year = (new Date()).getFullYear();
+  for(let month = (new Date()).getMonth() + 1; month > 0 ; month--) {  
+    monthTalkers.push(new Promise((resolve) => {
+      sql.query('SELECT `authorName`, COUNT(id) AS `messages` FROM `messages` WHERE YEAR(`createdAt`) = ? AND MONTH(`createdAt`) = ? GROUP BY `authorName` ORDER BY `messages` DESC LIMIT 0, 10', [year, month], (er, results) => {
+        resolve({
+          year: year,
+          month: month,
+          users: results
+        });
+      });      
+    }))
+  }
+
+  Promise.all([channelStats, Promise.all(monthTalkers), summary, last24h]).then(data => {
+    res.json({      
+      messagesTotal: data[2][0].messageCount,
+      activeUsersTotal: data[2][0].activeUsers,
+      messages24h: data[3][0].messageCount,
+      activeUsers24h: data[3][0].activeUsers,
+      channels: data[0],
+      talkers: data[1].reverse()
     })    
   })
 });
