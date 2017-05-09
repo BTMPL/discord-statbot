@@ -2,14 +2,27 @@ require('dotenv').config({path: '../.env'})
 
 const mysql = require('mysql');
 const fs = require('fs');
-const sql = mysql.createConnection({
-  host     : 'localhost',
-  user     : process.env.DB_USER,
-  password : process.env.DB_PASS,
-  database : process.env.DB_DATABASE,
-  supportBigNumbers: true
-});
-sql.connect();
+let sql;
+
+const sqlConnect = () => {
+  sql = mysql.createConnection({
+    host     : 'localhost',
+    user     : process.env.DB_USER,
+    password : process.env.DB_PASS,
+    database : process.env.DB_DATABASE,
+    supportBigNumbers: true
+  });
+  sql.connect();
+
+  sql.on('error', function(err) {
+    if(err.code === 'PROTOCOL_CONNECTION_LOST') { 
+      sqlConnect();
+    } else {
+      throw err;
+    }
+  });  
+}
+sqlConnect();
 
 const express = require('express');
 const https = require('https');
