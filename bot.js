@@ -18,7 +18,7 @@ const bot = new discord.Client();
 bot.login(process.env.DISCORD_HASH);
 
 const normalizeUrl = (url) => {	
-	url = url.toLowerCase().trim();
+	url = url.trim();
 	const ssl = url.indexOf('https:');
 	url = url.replace('http://www.', '');
 	url = url.replace('https://www.', '');
